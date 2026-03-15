@@ -8,6 +8,7 @@ import {
   Unique,
 } from 'typeorm';
 import { Group } from './group.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('group_members')
 @Unique(['group_id', 'user_id'])
@@ -30,4 +31,8 @@ export class GroupMember {
   @ManyToOne(() => Group, (group) => group.members, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'group_id' })
   group: Group;
+
+  @ManyToOne(() => User, { eager: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 }

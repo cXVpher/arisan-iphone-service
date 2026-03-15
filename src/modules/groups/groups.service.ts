@@ -37,23 +37,65 @@ export class GroupsService {
   }
 
   async findAll(): Promise<any[]> {
-    const groups = await this.groupRepo.find({ relations: ['members'] });
+    const groups = await this.groupRepo.find({ relations: ['members', 'members.user'] });
     return groups.map((g) => ({
-      ...g,
+      id: g.id,
+      name: g.name,
+      status: g.status,
+      max_members: g.max_members,
+      created_by: g.created_by,
+      next_draw_date: g.next_draw_date,
+      activated_at: g.activated_at,
+      created_at: g.created_at,
+      updated_at: g.updated_at,
       member_count: g.members.length,
+      members: g.members.map((m) => ({
+        id: m.id,
+        is_ketua: m.is_ketua,
+        joined_at: m.joined_at,
+        user: {
+          id: m.user.id,
+          username: m.user.username,
+          name: m.user.name,
+          role: m.user.role,
+        },
+      })),
     }));
   }
 
-  async findOne(id: string): Promise<Group> {
+  async findOne(id: string): Promise<any> {
     const group = await this.groupRepo.findOne({
       where: { id },
-      relations: ['members'],
+      relations: ['members', 'members.user'],
     });
     if (!group) throw new NotFoundException(`Group ${id} not found`);
-    return group;
+
+    return {
+      id: group.id,
+      name: group.name,
+      status: group.status,
+      max_members: group.max_members,
+      created_by: group.created_by,
+      next_draw_date: group.next_draw_date,
+      activated_at: group.activated_at,
+      created_at: group.created_at,
+      updated_at: group.updated_at,
+      member_count: group.members.length,
+      members: group.members.map((m) => ({
+        id: m.id,
+        is_ketua: m.is_ketua,
+        joined_at: m.joined_at,
+        user: {
+          id: m.user.id,
+          username: m.user.username,
+          name: m.user.name,
+          role: m.user.role,
+        },
+      })),
+    };
   }
 
-  async joinGroup(groupId: string, dto: JoinGroupDto): Promise<GroupMember> {
+  async joinGroup(groupId: string, dto: JoinGroupDto): Promise<any> {
     const group = await this.findOne(groupId);
 
     if (group.status === GroupStatus.FULL) {
@@ -82,7 +124,33 @@ export class GroupsService {
       await this.groupRepo.update(groupId, { status: GroupStatus.FULL });
     }
 
-    return saved;
+    // Load relations for nested response
+    const memberWithRelations = await this.memberRepo.findOne({
+      where: { id: saved.id },
+      relations: ['group', 'user'],
+    });
+
+    if (!memberWithRelations) {
+      throw new NotFoundException('Member not found after creation');
+    }
+
+    return {
+      id: memberWithRelations.id,
+      is_ketua: memberWithRelations.is_ketua,
+      joined_at: memberWithRelations.joined_at,
+      group: {
+        id: memberWithRelations.group.id,
+        name: memberWithRelations.group.name,
+        status: memberWithRelations.group.status,
+        created_by: memberWithRelations.group.created_by,
+      },
+      user: {
+        id: memberWithRelations.user.id,
+        username: memberWithRelations.user.username,
+        name: memberWithRelations.user.name,
+        role: memberWithRelations.user.role,
+      },
+    };
   }
 
   async setKetua(

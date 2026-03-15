@@ -35,7 +35,7 @@ export class AuthService {
       throw new ConflictException('NIK sudah terdaftar');
     }
 
-    let referrerId: number | null = null;
+    let referrerId: string | null = null;
     if (dto.referral_code) {
       const referrer = await this.userRepo.findOne({
         where: { referral_code: dto.referral_code },

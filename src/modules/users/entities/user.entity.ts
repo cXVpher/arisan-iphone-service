@@ -15,8 +15,8 @@ export enum Role {
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ type: 'varchar', length: 50, unique: true })
   username: string;
@@ -42,8 +42,8 @@ export class User {
   @Column({ type: 'varchar', length: 20, unique: true })
   referral_code: string;
 
-  @Column({ type: 'bigint', nullable: true })
-  referred_by: number | null;
+  @Column({ type: 'uuid', nullable: true })
+  referred_by: string | null;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'referred_by' })

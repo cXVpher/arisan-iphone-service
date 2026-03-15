@@ -14,18 +14,18 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 export class UsersService {
   constructor(@InjectRepository(User) private userRepo: Repository<User>) {}
 
-  async getProfile(userId: number): Promise<User> {
+  async getProfile(userId: string): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async updateProfile(userId: number, dto: UpdateProfileDto): Promise<User> {
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
     await this.userRepo.update(userId, dto);
     return this.getProfile(userId);
   }
 
-  async changePassword(userId: number, dto: ChangePasswordDto): Promise<void> {
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
     const user = await this.userRepo
       .createQueryBuilder('user')
       .addSelect('user.password_hash')
@@ -65,7 +65,7 @@ export class UsersService {
     };
   }
 
-  async findById(id: number): Promise<User> {
+  async findById(id: string): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     return user;
