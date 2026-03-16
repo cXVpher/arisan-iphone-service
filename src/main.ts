@@ -9,8 +9,9 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'http://member.localhost:3000',
-      'http://admin.localhost:3000',
+      'http://localhost:3001',
+      'https://arisan-iphone-service.zeabur.app',
+      'https://ariphone.online'
     ],
     credentials: true,
   });
