@@ -14,7 +14,9 @@ import { UploadModule } from './shared/upload/upload.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggerModule } from './common/logger/logger.module';
 import { Group } from './modules/groups/entities/group.entity';
 import { GroupMember } from './modules/groups/entities/group-member.entity';
 import { Ticket } from './modules/tickets/entities/ticket.entity';
@@ -25,19 +27,21 @@ import { User } from './modules/users/entities/user.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'mysql',
         host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 3306),
+        port: parseInt(config.get<string>('DB_PORT', '3306')),
         username: config.get<string>('DB_USER', 'root'),
         password: config.get<string>('DB_PASSWORD', ''),
         database: config.get<string>('DB_NAME', 'arisan_iphone_db'),
         entities: [User, Group, GroupMember, Ticket, Payment, Draw],
         synchronize: true, // auto-create tables — disable in production
         logging: false,
+        connectTimeout: 10000,
       }),
     }),
     UploadModule,
@@ -53,6 +57,7 @@ import { User } from './modules/users/entities/user.entity';
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
