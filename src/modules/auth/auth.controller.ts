@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
   UsePipes,
@@ -63,5 +65,25 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Get('check-referral')
+  @ApiOperation({ summary: 'Check if referral code is valid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Referral code is valid',
+    schema: {
+      example: {
+        valid: true,
+        referrer_name: 'John Doe',
+        referrer_username: 'johndoe',
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Code is required' })
+  @ApiResponse({ status: 404, description: 'Referral code not found' })
+  checkReferral(@Query('code') code: string) {
+    return this.authService.checkReferral(code);
   }
 }

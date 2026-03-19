@@ -3,6 +3,7 @@ import {
   ConflictException,
   BadRequestException,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -103,6 +104,23 @@ export class AuthService {
         name: user.name,
         role: user.role,
       },
+    };
+  }
+
+  async checkReferral(code: string) {
+    if (!code) throw new BadRequestException('Kode tidak boleh kosong');
+
+    const referrer = await this.userRepo.findOne({
+      where: { referral_code: code },
+      select: ['id', 'name', 'username'],
+    });
+
+    if (!referrer) throw new NotFoundException('Kode sponsor tidak valid');
+
+    return {
+      valid: true,
+      referrer_name: referrer.name,
+      referrer_username: referrer.username,
     };
   }
 }
