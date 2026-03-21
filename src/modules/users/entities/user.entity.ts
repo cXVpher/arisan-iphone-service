@@ -52,6 +52,9 @@ export class User {
   @Column({ type: 'enum', enum: Role, default: Role.MEMBER })
   role: Role;
 
+  @Column({ type: 'boolean', default: false })
+  is_ketua: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

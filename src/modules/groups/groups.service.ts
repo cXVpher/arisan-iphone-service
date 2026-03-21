@@ -11,7 +11,7 @@ import { Repository } from 'typeorm';
 import { Group, GroupStatus } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
 import { CreateGroupDto } from './dto/create-group.dto';
-import { JoinGroupDto } from './dto/join-group.dto';
+import { UpdateGroupDto } from './dto/update-group.dto';
 import { SetKetuaDto } from './dto/set-ketua.dto';
 import { ActivateGroupDto } from './dto/activate-group.dto';
 import { DrawsService } from '../draws/draws.service';
@@ -27,10 +27,12 @@ export class GroupsService {
     private readonly drawsService: DrawsService,
   ) {}
 
-  async createGroup(dto: CreateGroupDto): Promise<Group> {
+  async createGroup(dto: CreateGroupDto, userId: string): Promise<Group> {
     const group = this.groupRepo.create({
       name: dto.name,
-      created_by: dto.created_by,
+      ticket_price: dto.ticket_price || 0,
+      prize: dto.prize || null,
+      created_by: userId,
       status: GroupStatus.PENDING,
     });
     return this.groupRepo.save(group);
@@ -43,6 +45,8 @@ export class GroupsService {
       name: g.name,
       status: g.status,
       max_members: g.max_members,
+      ticket_price: g.ticket_price,
+      prize: g.prize,
       created_by: g.created_by,
       next_draw_date: g.next_draw_date,
       activated_at: g.activated_at,
@@ -75,6 +79,8 @@ export class GroupsService {
       name: group.name,
       status: group.status,
       max_members: group.max_members,
+      ticket_price: group.ticket_price,
+      prize: group.prize,
       created_by: group.created_by,
       next_draw_date: group.next_draw_date,
       activated_at: group.activated_at,
@@ -95,8 +101,47 @@ export class GroupsService {
     };
   }
 
-  async joinGroup(groupId: string, dto: JoinGroupDto): Promise<any> {
-    const group = await this.findOne(groupId);
+  async findByMember(userId: string): Promise<any[]> {
+    const members = await this.memberRepo.find({
+      where: { user_id: userId },
+      relations: ['group', 'group.members', 'group.members.user'],
+      order: { joined_at: 'DESC' },
+    });
+
+    return members.map((m) => ({
+      id: m.group.id,
+      name: m.group.name,
+      status: m.group.status,
+      max_members: m.group.max_members,
+      ticket_price: m.group.ticket_price,
+      prize: m.group.prize,
+      created_by: m.group.created_by,
+      next_draw_date: m.group.next_draw_date,
+      activated_at: m.group.activated_at,
+      created_at: m.group.created_at,
+      updated_at: m.group.updated_at,
+      member_count: m.group.members.length,
+      is_ketua: m.is_ketua,
+      joined_at: m.joined_at,
+      members: m.group.members.map((gm) => ({
+        id: gm.id,
+        is_ketua: gm.is_ketua,
+        joined_at: gm.joined_at,
+        user: {
+          id: gm.user.id,
+          username: gm.user.username,
+          name: gm.user.name,
+          role: gm.user.role,
+        },
+      })),
+    }));
+  }
+
+  async joinGroup(groupId: string, userId: string): Promise<any> {
+    const group = await this.groupRepo.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException(`Group ${groupId} not found`);
+    }
 
     if (group.status === GroupStatus.FULL) {
       throw new BadRequestException('Group is already full');
@@ -106,7 +151,7 @@ export class GroupsService {
     }
 
     const existing = await this.memberRepo.findOne({
-      where: { group_id: groupId, user_id: dto.user_id },
+      where: { group_id: groupId, user_id: userId },
     });
     if (existing) {
       throw new ConflictException('User is already a member of this group');
@@ -114,7 +159,7 @@ export class GroupsService {
 
     const member = this.memberRepo.create({
       group_id: groupId,
-      user_id: dto.user_id,
+      user_id: userId,
     });
     const saved = await this.memberRepo.save(member);
 
@@ -136,19 +181,16 @@ export class GroupsService {
 
     return {
       id: memberWithRelations.id,
-      is_ketua: memberWithRelations.is_ketua,
       joined_at: memberWithRelations.joined_at,
       group: {
         id: memberWithRelations.group.id,
         name: memberWithRelations.group.name,
         status: memberWithRelations.group.status,
-        created_by: memberWithRelations.group.created_by,
       },
       user: {
         id: memberWithRelations.user.id,
         username: memberWithRelations.user.username,
         name: memberWithRelations.user.name,
-        role: memberWithRelations.user.role,
       },
     };
   }
@@ -168,6 +210,24 @@ export class GroupsService {
     }
     member.is_ketua = dto.is_ketua;
     return this.memberRepo.save(member);
+  }
+
+  async updateGroup(groupId: string, dto: UpdateGroupDto): Promise<any> {
+    const group = await this.groupRepo.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException(`Group ${groupId} not found`);
+    }
+
+    const updateData: any = {};
+    if (dto.name) updateData.name = dto.name;
+    if (dto.max_members) updateData.max_members = dto.max_members;
+    if (dto.next_draw_date) updateData.next_draw_date = new Date(dto.next_draw_date);
+    if (dto.ticket_price !== undefined) updateData.ticket_price = dto.ticket_price;
+    if (dto.prize !== undefined) updateData.prize = dto.prize;
+
+    await this.groupRepo.update(groupId, updateData);
+
+    return this.findOne(groupId);
   }
 
   async activateGroup(groupId: string, dto: ActivateGroupDto): Promise<Group> {

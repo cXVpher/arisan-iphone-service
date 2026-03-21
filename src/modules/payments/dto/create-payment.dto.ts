@@ -11,10 +11,6 @@ export class CreatePaymentDto {
   @IsNotEmpty()
   ticket_id: string;
 
-  @IsUUID()
-  @IsNotEmpty()
-  user_id: string;
-
   @Type(() => Number)
   @IsNumber()
   @IsPositive()

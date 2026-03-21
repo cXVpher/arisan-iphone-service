@@ -4,9 +4,10 @@ import { TicketsService } from './tickets.service';
 import { TicketsController } from './tickets.controller';
 import { Ticket } from './entities/ticket.entity';
 import { Group } from '../groups/entities/group.entity';
+import { GroupMember } from '../groups/entities/group-member.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Ticket, Group])],
+  imports: [TypeOrmModule.forFeature([Ticket, Group, GroupMember])],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

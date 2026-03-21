@@ -35,6 +35,12 @@ export class Group {
   @Column({ type: 'timestamp', nullable: true })
   activated_at: Date | null;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  ticket_price: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  prize: string | null;
+
   @Column({ type: 'varchar', length: 36 })
   created_by: string;
 

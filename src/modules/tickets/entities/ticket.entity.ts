@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Group } from '../../groups/entities/group.entity';
+import { User } from '../../users/entities/user.entity';
 
 export enum TicketStatus {
   PENDING_PAYMENT = 'pending_payment',
@@ -40,6 +41,10 @@ export class Ticket {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
   @ManyToOne(() => Group, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'group_id' })

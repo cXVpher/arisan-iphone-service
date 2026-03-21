@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { apiReference } from '@scalar/nestjs-api-reference';
+import basicAuth from 'express-basic-auth';
 import { AppModule } from './app.module';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
@@ -16,6 +18,8 @@ async function bootstrap() {
       'https://ariphone.online'
     ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   const config = new DocumentBuilder()
@@ -39,7 +43,20 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+
+  app.use(
+    '/docs',
+    basicAuth({
+      users: {
+        [process.env.DOCS_USERNAME || 'admin']: process.env.DOCS_PASSWORD || 'admin',
+      },
+      challenge: true,
+    }),
+    apiReference({
+      content: document,
+      theme: 'kepler',
+    }),
+  );
 
   await app.listen(process.env.PORT ?? 3000);
 }
