@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -11,6 +13,9 @@ import { Draw, DrawStatus } from './entities/draw.entity';
 import { Group, GroupStatus } from '../groups/entities/group.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
 import { Ticket, TicketStatus } from '../tickets/entities/ticket.entity';
+import { ActivityLogService } from '../admin/services/activity-log.service';
+import { ActivityAction, ActivityTargetType } from '../admin/entities/activity-log.entity';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class DrawsService {
@@ -24,6 +29,8 @@ export class DrawsService {
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
     private readonly dataSource: DataSource,
+    @Inject(forwardRef(() => ActivityLogService))
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async createScheduledDraw(groupId: string, activatedAt: Date): Promise<Draw> {
@@ -123,6 +130,23 @@ export class DrawsService {
       // Group → COMPLETED
       await manager.update(Group, groupId, { status: GroupStatus.COMPLETED });
     });
+
+    // Log activity after transaction
+    const groupData = await this.groupRepo.findOne({ where: { id: groupId } });
+    const winnerData = await this.dataSource.manager.findOne(User, { where: { id: winnerUserId } });
+
+    if (groupData && winnerData) {
+      await this.activityLogService.log({
+        actorId: requestingUserId,
+        action: ActivityAction.DRAW_EXECUTED,
+        targetType: ActivityTargetType.GROUP,
+        targetId: groupId,
+        metadata: {
+          group_name: groupData.name,
+          winner_name: winnerData.name,
+        },
+      });
+    }
 
     return this.drawRepo.findOne({ where: { id: draw.id } }) as Promise<Draw>;
   }

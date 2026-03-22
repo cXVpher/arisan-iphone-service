@@ -53,11 +53,11 @@ export class TicketsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Group is not active',
+    description: 'Group is completed',
     schema: {
       example: {
         statusCode: 400,
-        message: 'Tickets can only be purchased for active groups',
+        message: 'Tickets cannot be purchased for completed groups',
         error: 'Bad Request',
       },
     },
@@ -68,12 +68,32 @@ export class TicketsController {
   }
 
   @Get('my-tickets')
-  @ApiOperation({ summary: 'Get all tickets for current user' })
+  @ApiOperation({ summary: 'Get all tickets for current user with latest payment info' })
   @ApiResponse({
     status: 200,
-    description: 'User tickets retrieved',
+    description: 'User tickets retrieved with latest payment per ticket',
     schema: {
-      example: [ticketExample],
+      example: [
+        {
+          id: 'ticket-uuid',
+          ticket_code: 'TKT-A3F2B1',
+          status: 'pending_payment',
+          created_at: '2026-03-15T14:30:00.000Z',
+          group: {
+            id: 'group-uuid',
+            name: 'Arisan iPhone 16 Pro Max',
+            ticket_price: 500000,
+          },
+          latest_payment: {
+            id: 'payment-uuid',
+            status: 'pending',
+            proof_url: 'https://s3.../proof.jpg',
+            note: null,
+            created_at: '2026-03-15T15:00:00.000Z',
+          },
+          payment_count: 1,
+        },
+      ],
     },
   })
   findMyTickets(@CurrentUser() user: User) {

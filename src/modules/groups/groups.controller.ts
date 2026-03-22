@@ -180,8 +180,9 @@ export class GroupsController {
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @Body() dto: SetKetuaDto,
+    @CurrentUser() user: User,
   ) {
-    return this.groupsService.setKetua(id, memberId, dto);
+    return this.groupsService.setKetua(id, memberId, dto, user.id);
   }
 
   @Patch(':id')

@@ -35,9 +35,9 @@ export class TicketsService {
     if (!group) {
       throw new NotFoundException(`Group ${dto.group_id} not found`);
     }
-    if (group.status !== GroupStatus.ACTIVE) {
+    if (group.status === GroupStatus.COMPLETED) {
       throw new BadRequestException(
-        'Tickets can only be purchased for active groups',
+        'Tickets cannot be purchased for completed groups',
       );
     }
 
@@ -46,6 +46,16 @@ export class TicketsService {
       where: { group_id: dto.group_id, user_id: userId },
     });
     if (!existing) {
+      // Validasi: jumlah member UNIK di grup (bukan jumlah ticket)
+      const memberCount = await this.memberRepo.count({
+        where: { group_id: dto.group_id },
+      });
+      if (memberCount >= group.max_members) {
+        throw new BadRequestException(
+          `Grup sudah penuh (max ${group.max_members} member)`,
+        );
+      }
+
       const member = this.memberRepo.create({
         group_id: dto.group_id,
         user_id: userId,
@@ -105,21 +115,42 @@ export class TicketsService {
       order: { created_at: 'DESC' },
     });
 
-    return tickets.map((t) => ({
-      id: t.id,
-      ticket_code: t.ticket_code,
-      status: t.status,
-      created_at: t.created_at,
-      user: {
-        id: t.user.id,
-        username: t.user.username,
-        name: t.user.name,
-      },
-      group: {
-        id: t.group.id,
-        name: t.group.name,
-      },
-    }));
+    // Get all payments for these tickets
+    const ticketIds = tickets.map((t) => t.id);
+    const payments = ticketIds.length > 0
+      ? await this.ticketRepo.query(
+          `SELECT * FROM payments WHERE ticket_id IN (?) ORDER BY created_at DESC`,
+          [ticketIds],
+        )
+      : [];
+
+    return tickets.map((t) => {
+      // Get latest payment for this ticket
+      const ticketPayments = payments.filter((p: any) => p.ticket_id === t.id);
+      const latestPayment = ticketPayments.length > 0
+        ? {
+            id: ticketPayments[0].id,
+            status: ticketPayments[0].status,
+            proof_url: ticketPayments[0].proof_url,
+            note: ticketPayments[0].note,
+            created_at: ticketPayments[0].created_at,
+          }
+        : null;
+
+      return {
+        id: t.id,
+        ticket_code: t.ticket_code,
+        status: t.status,
+        created_at: t.created_at,
+        group: {
+          id: t.group.id,
+          name: t.group.name,
+          ticket_price: t.group.ticket_price,
+        },
+        latest_payment: latestPayment,
+        payment_count: ticketPayments.length,
+      };
+    });
   }
 
   async findByUserAndGroup(userId: string, groupId: string): Promise<any[]> {

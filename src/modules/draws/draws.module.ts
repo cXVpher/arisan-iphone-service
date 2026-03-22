@@ -6,9 +6,10 @@ import { GroupMember } from '../groups/entities/group-member.entity';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { DrawsController } from './draws.controller';
 import { DrawsService } from './draws.service';
+import { AdminModule } from '../admin/admin.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Draw, Group, GroupMember, Ticket])],
+  imports: [TypeOrmModule.forFeature([Draw, Group, GroupMember, Ticket]), forwardRef(() => AdminModule)],
   controllers: [DrawsController],
   providers: [DrawsService],
   exports: [DrawsService],

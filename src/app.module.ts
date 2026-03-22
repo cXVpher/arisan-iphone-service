@@ -23,6 +23,10 @@ import { Ticket } from './modules/tickets/entities/ticket.entity';
 import { Payment } from './modules/payments/entities/payment.entity';
 import { Draw } from './modules/draws/entities/draw.entity';
 import { User } from './modules/users/entities/user.entity';
+import { AdminModule } from './modules/admin/admin.module';
+import { ActivityLog } from './modules/admin/entities/activity-log.entity';
+import { ReferralsModule } from './modules/referrals/referrals.module';
+import { ReferralReward } from './modules/referrals/entities/referral-reward.entity';
 
 @Module({
   imports: [
@@ -38,7 +42,7 @@ import { User } from './modules/users/entities/user.entity';
         username: config.get<string>('DB_USER', 'root'),
         password: config.get<string>('DB_PASSWORD', ''),
         database: config.get<string>('DB_NAME', 'arisan_iphone_db'),
-        entities: [User, Group, GroupMember, Ticket, Payment, Draw],
+        entities: [User, Group, GroupMember, Ticket, Payment, Draw, ActivityLog, ReferralReward],
         synchronize: true, // auto-create tables — disable in production
         logging: false,
         connectTimeout: 10000,
@@ -51,6 +55,8 @@ import { User } from './modules/users/entities/user.entity';
     TicketsModule,
     PaymentsModule,
     DrawsModule,
+    AdminModule,
+    ReferralsModule,
   ],
   controllers: [AppController],
   providers: [

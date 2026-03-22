@@ -113,6 +113,37 @@ export class PaymentsController {
     return this.paymentsService.createPayment(dto, file, user.id);
   }
 
+  @Get('my-payments')
+  @ApiOperation({ summary: 'List all my payments' })
+  @ApiResponse({
+    status: 200,
+    description: 'My payments retrieved',
+    schema: {
+      example: [
+        {
+          id: 'payment-uuid',
+          amount: 500000,
+          status: 'pending',
+          proof_url: 'https://s3.../proof.jpg',
+          note: null,
+          created_at: '2026-03-22T10:00:00Z',
+          ticket: {
+            id: 'ticket-uuid',
+            ticket_code: 'TKT-ABC123',
+            status: 'pending_payment',
+            group: {
+              id: 'group-uuid',
+              name: 'Arisan iPhone Group A',
+            },
+          },
+        },
+      ],
+    },
+  })
+  findMyPayments(@CurrentUser() user: User) {
+    return this.paymentsService.findByUser(user.id);
+  }
+
   @Get()
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'List all payments (ADMIN only)' })

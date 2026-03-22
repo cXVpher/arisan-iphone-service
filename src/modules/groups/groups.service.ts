@@ -15,6 +15,8 @@ import { UpdateGroupDto } from './dto/update-group.dto';
 import { SetKetuaDto } from './dto/set-ketua.dto';
 import { ActivateGroupDto } from './dto/activate-group.dto';
 import { DrawsService } from '../draws/draws.service';
+import { ActivityLogService } from '../admin/services/activity-log.service';
+import { ActivityAction, ActivityTargetType } from '../admin/entities/activity-log.entity';
 
 @Injectable()
 export class GroupsService {
@@ -25,6 +27,8 @@ export class GroupsService {
     private readonly memberRepo: Repository<GroupMember>,
     @Inject(forwardRef(() => DrawsService))
     private readonly drawsService: DrawsService,
+    @Inject(forwardRef(() => ActivityLogService))
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async createGroup(dto: CreateGroupDto, userId: string): Promise<Group> {
@@ -35,7 +39,17 @@ export class GroupsService {
       created_by: userId,
       status: GroupStatus.PENDING,
     });
-    return this.groupRepo.save(group);
+    const saved = await this.groupRepo.save(group);
+
+    await this.activityLogService.log({
+      actorId: userId,
+      action: ActivityAction.GROUP_CREATED,
+      targetType: ActivityTargetType.GROUP,
+      targetId: saved.id,
+      metadata: { group_name: saved.name },
+    });
+
+    return saved;
   }
 
   async findAll(): Promise<any[]> {
@@ -179,6 +193,17 @@ export class GroupsService {
       throw new NotFoundException('Member not found after creation');
     }
 
+    await this.activityLogService.log({
+      actorId: userId,
+      action: ActivityAction.MEMBER_JOINED,
+      targetType: ActivityTargetType.GROUP,
+      targetId: groupId,
+      metadata: {
+        group_name: memberWithRelations.group.name,
+        member_name: memberWithRelations.user.name,
+      },
+    });
+
     return {
       id: memberWithRelations.id,
       joined_at: memberWithRelations.joined_at,
@@ -199,17 +224,43 @@ export class GroupsService {
     groupId: string,
     memberId: string,
     dto: SetKetuaDto,
+    adminId: string,
   ): Promise<GroupMember> {
     const member = await this.memberRepo.findOne({
       where: { id: memberId, group_id: groupId },
+      relations: ['user', 'group'],
     });
     if (!member) {
       throw new NotFoundException(
         `Member ${memberId} not found in group ${groupId}`,
       );
     }
+
+    // Jika set sebagai ketua, unset ketua lain di grup ini
+    // Jika unset (is_ketua: false), langsung unset member ini saja
+    if (dto.is_ketua) {
+      await this.memberRepo.update(
+        { group_id: groupId, is_ketua: true },
+        { is_ketua: false },
+      );
+    }
+
     member.is_ketua = dto.is_ketua;
-    return this.memberRepo.save(member);
+    const saved = await this.memberRepo.save(member);
+
+    await this.activityLogService.log({
+      actorId: adminId,
+      action: ActivityAction.KETUA_SET,
+      targetType: ActivityTargetType.GROUP,
+      targetId: groupId,
+      metadata: {
+        group_name: member.group.name,
+        ketua_name: member.user.name,
+        is_ketua: dto.is_ketua,
+      },
+    });
+
+    return saved;
   }
 
   async updateGroup(groupId: string, dto: UpdateGroupDto): Promise<any> {
@@ -219,13 +270,43 @@ export class GroupsService {
     }
 
     const updateData: any = {};
-    if (dto.name) updateData.name = dto.name;
-    if (dto.max_members) updateData.max_members = dto.max_members;
-    if (dto.next_draw_date) updateData.next_draw_date = new Date(dto.next_draw_date);
-    if (dto.ticket_price !== undefined) updateData.ticket_price = dto.ticket_price;
-    if (dto.prize !== undefined) updateData.prize = dto.prize;
+    const changedFields: string[] = [];
+
+    if (dto.name) {
+      updateData.name = dto.name;
+      changedFields.push('name');
+    }
+    if (dto.max_members) {
+      updateData.max_members = dto.max_members;
+      changedFields.push('max_members');
+    }
+    if (dto.next_draw_date) {
+      updateData.next_draw_date = new Date(dto.next_draw_date);
+      changedFields.push('next_draw_date');
+    }
+    if (dto.ticket_price !== undefined) {
+      updateData.ticket_price = dto.ticket_price;
+      changedFields.push('ticket_price');
+    }
+    if (dto.prize !== undefined) {
+      updateData.prize = dto.prize;
+      changedFields.push('prize');
+    }
 
     await this.groupRepo.update(groupId, updateData);
+
+    if (changedFields.length > 0) {
+      await this.activityLogService.log({
+        actorId: group.created_by,
+        action: ActivityAction.GROUP_UPDATED,
+        targetType: ActivityTargetType.GROUP,
+        targetId: groupId,
+        metadata: {
+          group_name: updateData.name || group.name,
+          changed_fields: changedFields,
+        },
+      });
+    }
 
     return this.findOne(groupId);
   }
@@ -241,14 +322,26 @@ export class GroupsService {
     }
 
     const activatedAt = new Date();
+    const nextDrawDate = new Date(dto.next_draw_date);
 
     await this.groupRepo.update(groupId, {
       status: GroupStatus.ACTIVE,
-      next_draw_date: new Date(dto.next_draw_date),
+      next_draw_date: nextDrawDate,
       activated_at: activatedAt,
     });
 
     await this.drawsService.createScheduledDraw(groupId, activatedAt);
+
+    await this.activityLogService.log({
+      actorId: group.created_by,
+      action: ActivityAction.GROUP_ACTIVATED,
+      targetType: ActivityTargetType.GROUP,
+      targetId: groupId,
+      metadata: {
+        group_name: group.name,
+        draw_date: nextDrawDate.toISOString().split('T')[0],
+      },
+    });
 
     return this.findOne(groupId);
   }

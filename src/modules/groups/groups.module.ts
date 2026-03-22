@@ -5,11 +5,13 @@ import { GroupsController } from './groups.controller';
 import { Group } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
 import { DrawsModule } from '../draws/draws.module';
+import { AdminModule } from '../admin/admin.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Group, GroupMember]),
     forwardRef(() => DrawsModule),
+    forwardRef(() => AdminModule),
   ],
   controllers: [GroupsController],
   providers: [GroupsService],
