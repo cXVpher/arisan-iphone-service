@@ -52,12 +52,14 @@ export class GroupsService {
     return saved;
   }
 
-  async findAll(): Promise<any[]> {
-    const groups = await this.groupRepo.find({ relations: ['members', 'members.user'] });
+  async findAll(showHidden = false): Promise<any[]> {
+    const where = showHidden ? {} : { is_hidden: false };
+    const groups = await this.groupRepo.find({ where, relations: ['members', 'members.user'] });
     return groups.map((g) => ({
       id: g.id,
       name: g.name,
       status: g.status,
+      is_hidden: g.is_hidden,
       max_members: g.max_members,
       ticket_price: g.ticket_price,
       prize: g.prize,
@@ -92,6 +94,7 @@ export class GroupsService {
       id: group.id,
       name: group.name,
       status: group.status,
+      is_hidden: group.is_hidden,
       max_members: group.max_members,
       ticket_price: group.ticket_price,
       prize: group.prize,
@@ -291,6 +294,10 @@ export class GroupsService {
     if (dto.prize !== undefined) {
       updateData.prize = dto.prize;
       changedFields.push('prize');
+    }
+    if (dto.is_hidden !== undefined) {
+      updateData.is_hidden = dto.is_hidden;
+      changedFields.push('is_hidden');
     }
 
     await this.groupRepo.update(groupId, updateData);

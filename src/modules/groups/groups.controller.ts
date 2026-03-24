@@ -5,6 +5,7 @@ import {
   Patch,
   Param,
   Body,
+  Query,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { GroupsService } from './groups.service';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -101,6 +103,7 @@ export class GroupsController {
   @Get()
   @Public()
   @ApiOperation({ summary: 'List all groups' })
+  @ApiQuery({ name: 'show_hidden', required: false, type: Boolean, description: 'Admin only: include hidden groups' })
   @ApiResponse({
     status: 200,
     description: 'Groups list with members and user details',
@@ -108,8 +111,8 @@ export class GroupsController {
       example: [groupExample],
     },
   })
-  findAll() {
-    return this.groupsService.findAll();
+  findAll(@Query('show_hidden') showHidden?: string) {
+    return this.groupsService.findAll(showHidden === 'true');
   }
 
   @Get('my-groups')

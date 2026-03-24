@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsBoolean } from 'class-validator';
 
 export class UpdateGroupDto {
   @IsString()
@@ -20,4 +20,8 @@ export class UpdateGroupDto {
   @IsString()
   @IsOptional()
   prize?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  is_hidden?: boolean;
 }

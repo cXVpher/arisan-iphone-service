@@ -41,6 +41,9 @@ export class Group {
   @Column({ type: 'varchar', length: 255, nullable: true })
   prize: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  is_hidden: boolean;
+
   @Column({ type: 'varchar', length: 36 })
   created_by: string;
 
