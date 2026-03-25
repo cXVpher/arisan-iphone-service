@@ -57,11 +57,11 @@ export class ReferralRewardService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    // Get all rewards for this referrer
-    const rewards = await this.rewardRepo.find({
-      where: { referrer_id: userId },
-      relations: ['source_user'],
-    });
+    // Count total referrals from users.referred_by (semua anak yang daftar pakai kode ini)
+    const [totalReferrals, rewards] = await Promise.all([
+      this.userRepo.count({ where: { referred_by: userId } }),
+      this.rewardRepo.find({ where: { referrer_id: userId } }),
+    ]);
 
     const totalEarned = rewards.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalPending = rewards
@@ -71,11 +71,8 @@ export class ReferralRewardService {
       .filter((r) => r.status === RewardStatus.PAID)
       .reduce((sum, r) => sum + Number(r.amount), 0);
 
-    // Count unique children
-    const uniqueChildren = new Set(rewards.map((r) => r.source_user_id)).size;
-
     return {
-      total_referrals: uniqueChildren,
+      total_referrals: totalReferrals,
       total_earned: totalEarned,
       total_pending: totalPending,
       total_paid: totalPaid,
@@ -83,55 +80,50 @@ export class ReferralRewardService {
   }
 
   async getReferralList(userId: string) {
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      select: ['id', 'referral_code'],
-    });
+    const [user, directChildren, rewards] = await Promise.all([
+      this.userRepo.findOne({ where: { id: userId }, select: ['id', 'referral_code'] }),
+      this.userRepo.find({
+        where: { referred_by: userId },
+        select: ['id', 'name', 'username', 'created_at'],
+      }),
+      this.rewardRepo.find({
+        where: { referrer_id: userId },
+        relations: ['source_user', 'ticket', 'ticket.group'],
+      }),
+    ]);
+
     if (!user) throw new NotFoundException('User not found');
 
-    // Get all rewards
-    const rewards = await this.rewardRepo.find({
-      where: { referrer_id: userId },
-      relations: ['source_user', 'ticket', 'ticket.group'],
-    });
-
-    // Group by source user
-    const childrenMap = new Map();
+    // Build reward map per source_user_id
+    const rewardMap = new Map<string, { total_earned: number; status_breakdown: { pending: number; paid: number }; tickets_bought: number }>();
     rewards.forEach((reward) => {
       const childId = reward.source_user_id;
-      if (!childrenMap.has(childId)) {
-        childrenMap.set(childId, {
-          user: {
-            id: reward.source_user.id,
-            name: reward.source_user.name,
-            username: reward.source_user.username,
-          },
-          joined_at: reward.source_user.created_at,
-          tickets: [],
-          total_earned: 0,
-          status_breakdown: { pending: 0, paid: 0 },
-        });
+      if (!rewardMap.has(childId)) {
+        rewardMap.set(childId, { total_earned: 0, status_breakdown: { pending: 0, paid: 0 }, tickets_bought: 0 });
       }
-
-      const child = childrenMap.get(childId);
-      child.tickets.push({
-        id: reward.ticket_id,
-        amount: Number(reward.amount),
-        status: reward.status,
-      });
-      child.total_earned += Number(reward.amount);
+      const entry = rewardMap.get(childId)!;
+      entry.total_earned += Number(reward.amount);
+      entry.tickets_bought += 1;
       if (reward.status === RewardStatus.PENDING) {
-        child.status_breakdown.pending += Number(reward.amount);
+        entry.status_breakdown.pending += Number(reward.amount);
       } else {
-        child.status_breakdown.paid += Number(reward.amount);
+        entry.status_breakdown.paid += Number(reward.amount);
       }
     });
 
-    const children = Array.from(childrenMap.values()).map((child) => ({
-      ...child,
-      tickets_bought: child.tickets.length,
-      tickets: undefined,
-    }));
+    // Merge all direct children with their earnings (0 jika belum ada reward)
+    const children = directChildren.map((child) => {
+      const earning = rewardMap.get(child.id) ?? { total_earned: 0, status_breakdown: { pending: 0, paid: 0 }, tickets_bought: 0 };
+      return {
+        user_id: child.id,
+        name: child.name,
+        username: child.username,
+        joined_at: child.created_at,
+        tickets_bought: earning.tickets_bought,
+        total_earned: earning.total_earned,
+        status_breakdown: earning.status_breakdown,
+      };
+    });
 
     return {
       referral_code: user.referral_code,
@@ -139,7 +131,7 @@ export class ReferralRewardService {
       bonus_rate: '5%',
       children,
       summary: {
-        total_children: children.length,
+        total_children: directChildren.length,
         total_earned: rewards.reduce((sum, r) => sum + Number(r.amount), 0),
         total_pending: rewards
           .filter((r) => r.status === RewardStatus.PENDING)

@@ -27,6 +27,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { ActivityLog } from './modules/admin/entities/activity-log.entity';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { ReferralReward } from './modules/referrals/entities/referral-reward.entity';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ReferralReward } from './modules/referrals/entities/referral-reward.ent
     DrawsModule,
     AdminModule,
     ReferralsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
