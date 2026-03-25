@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Group, GroupStatus } from '../../groups/entities/group.entity';
 import { GroupMember } from '../../groups/entities/group-member.entity';
 import { Payment, PaymentStatus } from '../../payments/entities/payment.entity';
@@ -77,8 +77,10 @@ export class AdminStatsService {
       .select('COUNT(DISTINCT gm.user_id)', 'count')
       .getRawOne();
 
-    // Get total slots filled (count of all memberships)
-    const totalSlotsFilled = await this.memberRepo.count();
+    // Get total slots filled (count of all non-cancelled tickets)
+    const totalSlotsFilled = await this.ticketRepo.count({
+      where: { status: Not(TicketStatus.CANCELLED) },
+    });
 
     // Get total verified payments
     const verifiedPayments = await this.paymentRepo

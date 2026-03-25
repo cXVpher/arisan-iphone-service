@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
 import { Group, GroupStatus } from '../groups/entities/group.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
@@ -41,21 +41,21 @@ export class TicketsService {
       );
     }
 
+    // Cek kapasitas berdasarkan jumlah SLOT (ticket non-cancelled)
+    const slotCount = await this.ticketRepo.count({
+      where: { group_id: dto.group_id, status: Not(TicketStatus.CANCELLED) },
+    });
+    if (slotCount >= group.max_members) {
+      throw new BadRequestException(
+        `Grup sudah penuh (max ${group.max_members} slot)`,
+      );
+    }
+
     // Auto-join group if not already member
     const existing = await this.memberRepo.findOne({
       where: { group_id: dto.group_id, user_id: userId },
     });
     if (!existing) {
-      // Validasi: jumlah member UNIK di grup (bukan jumlah ticket)
-      const memberCount = await this.memberRepo.count({
-        where: { group_id: dto.group_id },
-      });
-      if (memberCount >= group.max_members) {
-        throw new BadRequestException(
-          `Grup sudah penuh (max ${group.max_members} member)`,
-        );
-      }
-
       const member = this.memberRepo.create({
         group_id: dto.group_id,
         user_id: userId,
@@ -80,6 +80,14 @@ export class TicketsService {
     });
 
     const saved = await this.ticketRepo.save(ticket);
+
+    // Update group status to FULL jika slot sudah penuh
+    const newSlotCount = await this.ticketRepo.count({
+      where: { group_id: dto.group_id, status: Not(TicketStatus.CANCELLED) },
+    });
+    if (newSlotCount >= group.max_members && group.status !== GroupStatus.FULL) {
+      await this.groupRepo.update(dto.group_id, { status: GroupStatus.FULL });
+    }
 
     // Load with relations
     const ticketWithRelations = await this.ticketRepo.findOne({

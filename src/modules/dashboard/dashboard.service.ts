@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Ticket, TicketStatus } from '../tickets/entities/ticket.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
@@ -39,16 +39,19 @@ export class DashboardService {
       memberships
         .filter((m) => m.group.status !== GroupStatus.COMPLETED)
         .map(async (m) => {
-          const [myTicketCount, memberCount] = await Promise.all([
+          const [myTicketCount, memberCount, slotCount] = await Promise.all([
             this.ticketRepo.count({ where: { user_id: userId, group_id: m.group.id } }),
             this.memberRepo.count({ where: { group_id: m.group.id } }),
+            this.ticketRepo.count({ where: { group_id: m.group.id, status: Not(TicketStatus.CANCELLED) } }),
           ]);
           return {
             id: m.group.id,
             name: m.group.name,
             status: m.group.status,
             member_count: memberCount,
+            slot_count: slotCount,
             max_members: m.group.max_members,
+            max_slots: m.group.max_members,
             draw_date: m.group.next_draw_date,
             my_ticket_count: myTicketCount,
           };

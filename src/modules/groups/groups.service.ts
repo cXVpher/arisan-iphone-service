@@ -8,9 +8,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Not } from 'typeorm';
 import { Group, GroupStatus } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
-import { Ticket } from '../tickets/entities/ticket.entity';
+import { Ticket, TicketStatus } from '../tickets/entities/ticket.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
@@ -61,12 +62,24 @@ export class GroupsService {
   async findAll(showHidden = false): Promise<any[]> {
     const where = showHidden ? {} : { is_hidden: false };
     const groups = await this.groupRepo.find({ where, relations: ['members', 'members.user'] });
+
+    // Batch query slot counts (non-cancelled tickets per group)
+    const slotCountsRaw = await this.ticketRepo
+      .createQueryBuilder('t')
+      .select('t.group_id', 'group_id')
+      .addSelect('COUNT(*)', 'count')
+      .where('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
+      .groupBy('t.group_id')
+      .getRawMany();
+    const slotMap = new Map(slotCountsRaw.map((r) => [r.group_id, parseInt(r.count, 10)]));
+
     return groups.map((g) => ({
       id: g.id,
       name: g.name,
       status: g.status,
       is_hidden: g.is_hidden,
       max_members: g.max_members,
+      max_slots: g.max_members,
       ticket_price: g.ticket_price,
       prize: g.prize,
       created_by: g.created_by,
@@ -75,6 +88,7 @@ export class GroupsService {
       created_at: g.created_at,
       updated_at: g.updated_at,
       member_count: g.members.length,
+      slot_count: slotMap.get(g.id) ?? 0,
       members: g.members.map((m) => ({
         id: m.id,
         is_ketua: m.is_ketua,
@@ -96,12 +110,31 @@ export class GroupsService {
     });
     if (!group) throw new NotFoundException(`Group ${id} not found`);
 
+    const [slotCount, ticketCountsRaw] = await Promise.all([
+      this.ticketRepo.count({
+        where: { group_id: id, status: Not(TicketStatus.CANCELLED) },
+      }),
+      this.ticketRepo
+        .createQueryBuilder('t')
+        .select('t.user_id', 'user_id')
+        .addSelect('COUNT(*)', 'count')
+        .where('t.group_id = :id', { id })
+        .andWhere('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
+        .groupBy('t.user_id')
+        .getRawMany(),
+    ]);
+
+    const ticketCountMap = new Map(
+      ticketCountsRaw.map((r) => [r.user_id, parseInt(r.count, 10)]),
+    );
+
     return {
       id: group.id,
       name: group.name,
       status: group.status,
       is_hidden: group.is_hidden,
       max_members: group.max_members,
+      max_slots: group.max_members,
       ticket_price: group.ticket_price,
       prize: group.prize,
       created_by: group.created_by,
@@ -110,10 +143,12 @@ export class GroupsService {
       created_at: group.created_at,
       updated_at: group.updated_at,
       member_count: group.members.length,
+      slot_count: slotCount,
       members: group.members.map((m) => ({
         id: m.id,
         is_ketua: m.is_ketua,
         joined_at: m.joined_at,
+        ticket_count: ticketCountMap.get(m.user_id) ?? 0,
         user: {
           id: m.user.id,
           username: m.user.username,
@@ -131,11 +166,27 @@ export class GroupsService {
       order: { joined_at: 'DESC' },
     });
 
+    // Batch query slot counts
+    const groupIds = members.map((m) => m.group.id);
+    let slotMap = new Map<string, number>();
+    if (groupIds.length > 0) {
+      const slotCountsRaw = await this.ticketRepo
+        .createQueryBuilder('t')
+        .select('t.group_id', 'group_id')
+        .addSelect('COUNT(*)', 'count')
+        .where('t.group_id IN (:...ids)', { ids: groupIds })
+        .andWhere('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
+        .groupBy('t.group_id')
+        .getRawMany();
+      slotMap = new Map(slotCountsRaw.map((r) => [r.group_id, parseInt(r.count, 10)]));
+    }
+
     return members.map((m) => ({
       id: m.group.id,
       name: m.group.name,
       status: m.group.status,
       max_members: m.group.max_members,
+      max_slots: m.group.max_members,
       ticket_price: m.group.ticket_price,
       prize: m.group.prize,
       created_by: m.group.created_by,
@@ -144,6 +195,7 @@ export class GroupsService {
       created_at: m.group.created_at,
       updated_at: m.group.updated_at,
       member_count: m.group.members.length,
+      slot_count: slotMap.get(m.group.id) ?? 0,
       is_ketua: m.is_ketua,
       joined_at: m.joined_at,
       members: m.group.members.map((gm) => ({
@@ -166,11 +218,16 @@ export class GroupsService {
       throw new NotFoundException(`Group ${groupId} not found`);
     }
 
-    if (group.status === GroupStatus.FULL) {
-      throw new BadRequestException('Group is already full');
-    }
     if (group.status === GroupStatus.ACTIVE) {
       throw new BadRequestException('Group is already active, cannot join');
+    }
+
+    // Cek kapasitas berdasarkan slot (ticket count)
+    const slotCount = await this.ticketRepo.count({
+      where: { group_id: groupId, status: Not(TicketStatus.CANCELLED) },
+    });
+    if (slotCount >= group.max_members) {
+      throw new BadRequestException('Group is already full');
     }
 
     const existing = await this.memberRepo.findOne({
@@ -185,12 +242,6 @@ export class GroupsService {
       user_id: userId,
     });
     const saved = await this.memberRepo.save(member);
-
-    // Re-count after save
-    const count = await this.memberRepo.count({ where: { group_id: groupId } });
-    if (count >= group.max_members) {
-      await this.groupRepo.update(groupId, { status: GroupStatus.FULL });
-    }
 
     // Load relations for nested response
     const memberWithRelations = await this.memberRepo.findOne({
