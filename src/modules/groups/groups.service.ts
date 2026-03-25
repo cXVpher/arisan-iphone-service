@@ -7,8 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Not } from 'typeorm';
+import { Repository, In, Not } from 'typeorm';
 import { Group, GroupStatus } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
 import { Ticket, TicketStatus } from '../tickets/entities/ticket.entity';
@@ -20,6 +19,8 @@ import { ActivateGroupDto } from './dto/activate-group.dto';
 import { DrawsService } from '../draws/draws.service';
 import { ActivityLogService } from '../admin/services/activity-log.service';
 import { ActivityAction, ActivityTargetType } from '../admin/entities/activity-log.entity';
+
+const ELIGIBLE_STATUSES = [TicketStatus.PAID, TicketStatus.ACTIVE, TicketStatus.WON];
 
 @Injectable()
 export class GroupsService {
@@ -63,12 +64,12 @@ export class GroupsService {
     const where = showHidden ? {} : { is_hidden: false };
     const groups = await this.groupRepo.find({ where, relations: ['members', 'members.user'] });
 
-    // Batch query slot counts (non-cancelled tickets per group)
+    // Batch query slot counts (eligible tickets only: paid, active, won)
     const slotCountsRaw = await this.ticketRepo
       .createQueryBuilder('t')
       .select('t.group_id', 'group_id')
       .addSelect('COUNT(*)', 'count')
-      .where('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
+      .where('t.status IN (:...statuses)', { statuses: ELIGIBLE_STATUSES })
       .groupBy('t.group_id')
       .getRawMany();
     const slotMap = new Map(slotCountsRaw.map((r) => [r.group_id, parseInt(r.count, 10)]));
@@ -112,7 +113,7 @@ export class GroupsService {
 
     const [slotCount, groupTickets] = await Promise.all([
       this.ticketRepo.count({
-        where: { group_id: id, status: Not(TicketStatus.CANCELLED) },
+        where: { group_id: id, status: In(ELIGIBLE_STATUSES) },
       }),
       this.ticketRepo.find({
         where: { group_id: id, status: Not(TicketStatus.CANCELLED) },
@@ -183,7 +184,7 @@ export class GroupsService {
         .select('t.group_id', 'group_id')
         .addSelect('COUNT(*)', 'count')
         .where('t.group_id IN (:...ids)', { ids: groupIds })
-        .andWhere('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
+        .andWhere('t.status IN (:...statuses)', { statuses: ELIGIBLE_STATUSES })
         .groupBy('t.group_id')
         .getRawMany();
       slotMap = new Map(slotCountsRaw.map((r) => [r.group_id, parseInt(r.count, 10)]));

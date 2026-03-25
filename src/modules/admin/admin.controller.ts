@@ -1,10 +1,11 @@
-import { Controller, Get, Param, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { AdminStatsService } from './services/admin-stats.service';
 import { ActivityLogService } from './services/activity-log.service';
 import { GetActivityQueryDto } from './dto/get-activity-query.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '../users/entities/user.entity';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Role, User } from '../users/entities/user.entity';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT')
@@ -121,6 +122,42 @@ export class AdminController {
     };
   }
 
+  @Get('tickets')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get all tickets with optional filters (ADMIN only)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by ticket status', enum: ['pending_payment', 'paid', 'cancelled', 'active', 'won', 'expired'] })
+  @ApiQuery({ name: 'groupId', required: false, description: 'Filter by group UUID' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'All tickets retrieved',
+    schema: {
+      example: [{
+        id: 'uuid',
+        ticket_code: 'TKT-5C41AD',
+        status: 'pending_payment',
+        created_at: '2026-03-22T04:50:51.721Z',
+        group: { id: 'uuid', name: 'Arisan iPhone Group A', ticket_price: 20000000, status: 'active' },
+        user: { id: 'uuid', username: 'daniel_member', name: 'Daniel' },
+        latest_payment: {
+          id: 'uuid',
+          status: 'pending',
+          proof_url: 'https://s3.../proof.jpg',
+          amount: 20000000,
+          note: null,
+          created_at: '2026-03-22T05:00:00.000Z',
+        },
+      }],
+    },
+  })
+  getAllTickets(
+    @Query('status') status?: string,
+    @Query('groupId') groupId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.adminStatsService.getAllTickets({ status: status as any, groupId, userId });
+  }
+
   @Get('users/:userId/tickets')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Get all tickets for a specific user (ADMIN only)' })
@@ -152,5 +189,33 @@ export class AdminController {
   })
   getUserTickets(@Param('userId') userId: string) {
     return this.adminStatsService.getUserTickets(userId);
+  }
+
+  @Patch('tickets/:ticketId/expire')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Expire a pending_payment ticket (ADMIN only)' })
+  @ApiParam({ name: 'ticketId', type: String, description: 'Ticket UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket expired successfully',
+    schema: {
+      example: {
+        id: 'uuid',
+        ticket_code: 'TKT-5C41AD',
+        status: 'expired',
+        created_at: '2026-03-22T04:50:51.721Z',
+        warning: null,
+        group: { id: 'uuid', name: 'Arisan iPhone Group A' },
+        user: { id: 'uuid', username: 'daniel_member', name: 'Daniel' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Ticket is not pending_payment or has pending payment' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  expireTicket(
+    @Param('ticketId') ticketId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.adminStatsService.expireTicket(ticketId, user.id);
   }
 }

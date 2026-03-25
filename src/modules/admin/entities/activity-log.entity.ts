@@ -13,12 +13,14 @@ export enum ActivityAction {
   PAYMENT_VERIFIED = 'payment_verified',
   PAYMENT_REJECTED = 'payment_rejected',
   DRAW_EXECUTED = 'draw_executed',
+  TICKET_EXPIRED = 'ticket_expired',
 }
 
 export enum ActivityTargetType {
   GROUP = 'group',
   USER = 'user',
   PAYMENT = 'payment',
+  TICKET = 'ticket',
 }
 
 @Index('idx_created_at', { synchronize: false })
