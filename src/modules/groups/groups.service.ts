@@ -110,23 +110,22 @@ export class GroupsService {
     });
     if (!group) throw new NotFoundException(`Group ${id} not found`);
 
-    const [slotCount, ticketCountsRaw] = await Promise.all([
+    const [slotCount, groupTickets] = await Promise.all([
       this.ticketRepo.count({
         where: { group_id: id, status: Not(TicketStatus.CANCELLED) },
       }),
-      this.ticketRepo
-        .createQueryBuilder('t')
-        .select('t.user_id', 'user_id')
-        .addSelect('COUNT(*)', 'count')
-        .where('t.group_id = :id', { id })
-        .andWhere('t.status != :cancelled', { cancelled: TicketStatus.CANCELLED })
-        .groupBy('t.user_id')
-        .getRawMany(),
+      this.ticketRepo.find({
+        where: { group_id: id, status: Not(TicketStatus.CANCELLED) },
+        order: { created_at: 'ASC' },
+      }),
     ]);
 
-    const ticketCountMap = new Map(
-      ticketCountsRaw.map((r) => [r.user_id, parseInt(r.count, 10)]),
-    );
+    // Group tickets by user_id
+    const ticketsByUser = new Map<string, typeof groupTickets>();
+    groupTickets.forEach((t) => {
+      if (!ticketsByUser.has(t.user_id)) ticketsByUser.set(t.user_id, []);
+      ticketsByUser.get(t.user_id)!.push(t);
+    });
 
     return {
       id: group.id,
@@ -144,18 +143,27 @@ export class GroupsService {
       updated_at: group.updated_at,
       member_count: group.members.length,
       slot_count: slotCount,
-      members: group.members.map((m) => ({
-        id: m.id,
-        is_ketua: m.is_ketua,
-        joined_at: m.joined_at,
-        ticket_count: ticketCountMap.get(m.user_id) ?? 0,
-        user: {
-          id: m.user.id,
-          username: m.user.username,
-          name: m.user.name,
-          role: m.user.role,
-        },
-      })),
+      members: group.members.map((m) => {
+        const userTickets = ticketsByUser.get(m.user_id) ?? [];
+        return {
+          id: m.id,
+          is_ketua: m.is_ketua,
+          joined_at: m.joined_at,
+          ticket_count: userTickets.length,
+          tickets: userTickets.map((t) => ({
+            id: t.id,
+            ticket_code: t.ticket_code,
+            status: t.status,
+            created_at: t.created_at,
+          })),
+          user: {
+            id: m.user.id,
+            username: m.user.username,
+            name: m.user.name,
+            role: m.user.role,
+          },
+        };
+      }),
     };
   }
 
