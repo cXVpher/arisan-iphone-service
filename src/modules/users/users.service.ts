@@ -65,9 +65,19 @@ export class UsersService {
     };
   }
 
-  async findById(id: string): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } });
+  async findById(id: string): Promise<any> {
+    const user = await this.userRepo.findOne({
+      where: { id },
+      relations: ['referrer'],
+    });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+
+    return {
+      ...user,
+      referred_by: user.referrer
+        ? { id: user.referrer.id, username: user.referrer.username, name: user.referrer.name }
+        : null,
+      referrer: undefined,
+    };
   }
 }

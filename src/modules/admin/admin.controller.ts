@@ -1,5 +1,5 @@
-import { Controller, Get, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { AdminStatsService } from './services/admin-stats.service';
 import { ActivityLogService } from './services/activity-log.service';
 import { GetActivityQueryDto } from './dto/get-activity-query.dto';
@@ -119,5 +119,38 @@ export class AdminController {
       next_cursor,
       has_more,
     };
+  }
+
+  @Get('users/:userId/tickets')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get all tickets for a specific user (ADMIN only)' })
+  @ApiParam({ name: 'userId', type: String, description: 'User UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'User tickets retrieved',
+    schema: {
+      example: [
+        {
+          id: 'uuid',
+          ticket_code: 'TKT-5C41AD',
+          status: 'pending_payment',
+          created_at: '2026-03-22T04:50:51.721Z',
+          group: {
+            id: 'uuid',
+            name: 'Arisan iPhone Group A',
+            ticket_price: 500000,
+            status: 'active',
+          },
+          user: {
+            id: 'uuid',
+            username: 'daniel_member',
+            name: 'Daniel',
+          },
+        },
+      ],
+    },
+  })
+  getUserTickets(@Param('userId') userId: string) {
+    return this.adminStatsService.getUserTickets(userId);
   }
 }

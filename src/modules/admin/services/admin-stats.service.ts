@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Group, GroupStatus } from '../../groups/entities/group.entity';
 import { GroupMember } from '../../groups/entities/group-member.entity';
 import { Payment, PaymentStatus } from '../../payments/entities/payment.entity';
+import { Ticket, TicketStatus } from '../../tickets/entities/ticket.entity';
 
 export interface StatsResponse {
   groups: {
@@ -40,6 +41,8 @@ export class AdminStatsService {
     private readonly memberRepo: Repository<GroupMember>,
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
+    @InjectRepository(Ticket)
+    private readonly ticketRepo: Repository<Ticket>,
   ) {}
 
   async getStats(): Promise<StatsResponse> {
@@ -131,5 +134,31 @@ export class AdminStatsService {
         payments_pending: pendingPayments,
       },
     };
+  }
+
+  async getUserTickets(userId: string): Promise<any[]> {
+    const tickets = await this.ticketRepo.find({
+      where: { user_id: userId },
+      relations: ['group', 'user'],
+      order: { created_at: 'DESC' },
+    });
+
+    return tickets.map((t) => ({
+      id: t.id,
+      ticket_code: t.ticket_code,
+      status: t.status,
+      created_at: t.created_at,
+      group: {
+        id: t.group.id,
+        name: t.group.name,
+        ticket_price: t.group.ticket_price,
+        status: t.group.status,
+      },
+      user: {
+        id: t.user.id,
+        username: t.user.username,
+        name: t.user.name,
+      },
+    }));
   }
 }

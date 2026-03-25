@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -225,5 +226,16 @@ export class GroupsController {
   @ApiResponse({ status: 403, description: 'Forbidden - admin access required' })
   activate(@Param('id') id: string, @Body() dto: ActivateGroupDto) {
     return this.groupsService.activateGroup(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Delete group (ADMIN only)' })
+  @ApiParam({ name: 'id', type: String, description: 'Group ID (UUID)' })
+  @ApiResponse({ status: 200, description: 'Group deleted successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - admin access required' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  remove(@Param('id') id: string) {
+    return this.groupsService.deleteGroup(id);
   }
 }

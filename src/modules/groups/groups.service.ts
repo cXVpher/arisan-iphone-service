@@ -318,6 +318,13 @@ export class GroupsService {
     return this.findOne(groupId);
   }
 
+  async deleteGroup(groupId: string): Promise<{ message: string }> {
+    const group = await this.groupRepo.findOne({ where: { id: groupId } });
+    if (!group) throw new NotFoundException(`Group ${groupId} not found`);
+    await this.groupRepo.remove(group);
+    return { message: 'Group deleted successfully' };
+  }
+
   async activateGroup(groupId: string, dto: ActivateGroupDto): Promise<Group> {
     const group = await this.findOne(groupId);
 

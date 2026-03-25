@@ -7,9 +7,10 @@ import { ActivityLog } from './entities/activity-log.entity';
 import { Group } from '../groups/entities/group.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
 import { Payment } from '../payments/entities/payment.entity';
+import { Ticket } from '../tickets/entities/ticket.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ActivityLog, Group, GroupMember, Payment])],
+  imports: [TypeOrmModule.forFeature([ActivityLog, Group, GroupMember, Payment, Ticket])],
   controllers: [AdminController],
   providers: [AdminStatsService, ActivityLogService],
   exports: [ActivityLogService],
