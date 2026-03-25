@@ -8,10 +8,12 @@ import { extname } from 'path';
 export class UploadService {
   private readonly s3: S3Client;
   private readonly bucket: string;
+  private readonly region: string;
 
   constructor(private readonly config: ConfigService) {
+    this.region = config.get<string>('AWS_REGION', '');
     this.s3 = new S3Client({
-      region: config.get<string>('AWS_REGION', 'ap-southeast-1'),
+      region: this.region,
       credentials: {
         accessKeyId: config.get<string>('AWS_ACCESS_KEY_ID', ''),
         secretAccessKey: config.get<string>('AWS_SECRET_ACCESS_KEY', ''),
@@ -33,7 +35,6 @@ export class UploadService {
       }),
     );
 
-    const region = this.config.get<string>('AWS_REGION', 'ap-southeast-1');
-    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 }

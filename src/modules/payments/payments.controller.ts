@@ -35,7 +35,7 @@ const paymentExample = {
   id: 'c1d2e3f4-a5b6-7890-abcd-ef1234567890',
   amount: 500000,
   status: 'pending',
-  proof_url: 'https://s3.ap-southeast-1.amazonaws.com/bucket/payments/proof-123.jpg',
+  proof_url: 'https://bucket.s3.amazonaws.com/payments/proof-123.jpg',
   note: null,
   created_at: '2026-03-15T15:00:00.000Z',
   updated_at: '2026-03-15T15:00:00.000Z',

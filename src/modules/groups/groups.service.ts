@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Group, GroupStatus } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
+import { Ticket } from '../tickets/entities/ticket.entity';
+import { Payment } from '../payments/entities/payment.entity';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { SetKetuaDto } from './dto/set-ketua.dto';
@@ -25,6 +27,10 @@ export class GroupsService {
     private readonly groupRepo: Repository<Group>,
     @InjectRepository(GroupMember)
     private readonly memberRepo: Repository<GroupMember>,
+    @InjectRepository(Ticket)
+    private readonly ticketRepo: Repository<Ticket>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
     @Inject(forwardRef(() => DrawsService))
     private readonly drawsService: DrawsService,
     @Inject(forwardRef(() => ActivityLogService))
@@ -321,7 +327,31 @@ export class GroupsService {
   async deleteGroup(groupId: string): Promise<{ message: string }> {
     const group = await this.groupRepo.findOne({ where: { id: groupId } });
     if (!group) throw new NotFoundException(`Group ${groupId} not found`);
+
+    // Ambil semua ticket di grup ini
+    const tickets = await this.ticketRepo.find({ where: { group_id: groupId } });
+    const ticketIds = tickets.map((t) => t.id);
+
+    // Hapus payments yang terkait ticket grup ini
+    if (ticketIds.length > 0) {
+      await this.paymentRepo
+        .createQueryBuilder()
+        .delete()
+        .where('ticket_id IN (:...ids)', { ids: ticketIds })
+        .execute();
+    }
+
+    // Hapus tickets
+    if (tickets.length > 0) {
+      await this.ticketRepo.remove(tickets);
+    }
+
+    // Hapus group members (sudah cascade di entity, tapi eksplisit lebih aman)
+    await this.memberRepo.delete({ group_id: groupId });
+
+    // Hapus group
     await this.groupRepo.remove(group);
+
     return { message: 'Group deleted successfully' };
   }
 
