@@ -44,6 +44,7 @@ export class GroupsService {
       name: dto.name,
       ticket_price: dto.ticket_price || 0,
       prize: dto.prize || null,
+      icon: dto.icon || 'smartphone',
       created_by: userId,
       status: GroupStatus.PENDING,
     });
@@ -79,6 +80,7 @@ export class GroupsService {
       name: g.name,
       status: g.status,
       is_hidden: g.is_hidden,
+      icon: g.icon,
       max_members: g.max_members,
       max_slots: g.max_members,
       ticket_price: g.ticket_price,
@@ -133,6 +135,7 @@ export class GroupsService {
       name: group.name,
       status: group.status,
       is_hidden: group.is_hidden,
+      icon: group.icon,
       max_members: group.max_members,
       max_slots: group.max_members,
       ticket_price: group.ticket_price,
@@ -194,6 +197,7 @@ export class GroupsService {
       id: m.group.id,
       name: m.group.name,
       status: m.group.status,
+      icon: m.group.icon,
       max_members: m.group.max_members,
       max_slots: m.group.max_members,
       ticket_price: m.group.ticket_price,
@@ -360,6 +364,10 @@ export class GroupsService {
     if (dto.prize !== undefined) {
       updateData.prize = dto.prize;
       changedFields.push('prize');
+    }
+    if (dto.icon !== undefined) {
+      updateData.icon = dto.icon;
+      changedFields.push('icon');
     }
     if (dto.is_hidden !== undefined) {
       updateData.is_hidden = dto.is_hidden;

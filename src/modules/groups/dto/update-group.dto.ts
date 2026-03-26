@@ -1,4 +1,6 @@
-import { IsString, IsOptional, IsNumber, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsBoolean, IsIn } from 'class-validator';
+import { GROUP_ICONS } from './create-group.dto';
+import type { GroupIcon } from './create-group.dto';
 
 export class UpdateGroupDto {
   @IsString()
@@ -24,4 +26,8 @@ export class UpdateGroupDto {
   @IsBoolean()
   @IsOptional()
   is_hidden?: boolean;
+
+  @IsIn(GROUP_ICONS)
+  @IsOptional()
+  icon?: GroupIcon;
 }

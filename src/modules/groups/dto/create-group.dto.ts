@@ -1,4 +1,7 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsIn } from 'class-validator';
+
+export const GROUP_ICONS = ['smartphone', 'bike', 'shopping-bag'] as const;
+export type GroupIcon = typeof GROUP_ICONS[number];
 
 export class CreateGroupDto {
   @IsString()
@@ -12,4 +15,8 @@ export class CreateGroupDto {
   @IsString()
   @IsOptional()
   prize?: string;
+
+  @IsIn(GROUP_ICONS)
+  @IsOptional()
+  icon?: GroupIcon;
 }
