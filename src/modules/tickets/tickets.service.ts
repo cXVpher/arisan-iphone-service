@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
 import { Group, GroupStatus } from '../groups/entities/group.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
@@ -41,9 +41,9 @@ export class TicketsService {
       );
     }
 
-    // Cek kapasitas berdasarkan jumlah SLOT (ticket non-cancelled)
+    // Cek kapasitas berdasarkan jumlah SLOT (ticket non-cancelled dan non-expired)
     const slotCount = await this.ticketRepo.count({
-      where: { group_id: dto.group_id, status: Not(TicketStatus.CANCELLED) },
+      where: { group_id: dto.group_id, status: Not(In([TicketStatus.CANCELLED, TicketStatus.EXPIRED])) },
     });
     if (slotCount >= group.max_members) {
       throw new BadRequestException(
