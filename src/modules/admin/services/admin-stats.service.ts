@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Group, GroupStatus } from '../../groups/entities/group.entity';
 import { GroupMember } from '../../groups/entities/group-member.entity';
 import { Payment, PaymentStatus } from '../../payments/entities/payment.entity';
@@ -183,6 +183,16 @@ export class AdminStatsService {
     ticket.status = TicketStatus.EXPIRED;
     await this.ticketRepo.save(ticket);
 
+    // Rollback status grup jika sebelumnya FULL tapi slot sudah berkurang
+    if (ticket.group.status === GroupStatus.FULL) {
+      const slotCount = await this.ticketRepo.count({
+        where: { group_id: ticket.group_id, status: Not(TicketStatus.CANCELLED) },
+      });
+      if (slotCount < ticket.group.max_members) {
+        await this.groupRepo.update(ticket.group_id, { status: GroupStatus.PENDING });
+      }
+    }
+
     await this.activityLogService.log({
       actorId: adminId,
       action: ActivityAction.TICKET_EXPIRED,
@@ -211,6 +221,51 @@ export class AdminStatsService {
         username: ticket.user.username,
         name: ticket.user.name,
       },
+    };
+  }
+
+  async syncGroupStatus(groupId: string): Promise<any> {
+    const group = await this.groupRepo.findOne({ where: { id: groupId } });
+    if (!group) throw new NotFoundException(`Group ${groupId} not found`);
+
+    // Jangan sync grup yang sudah active atau completed
+    if (group.status === GroupStatus.ACTIVE || group.status === GroupStatus.COMPLETED) {
+      return {
+        id: group.id,
+        name: group.name,
+        status: group.status,
+        synced: false,
+        message: `Status ${group.status} tidak di-sync otomatis`,
+      };
+    }
+
+    const slotCount = await this.ticketRepo.count({
+      where: { group_id: groupId, status: Not(TicketStatus.CANCELLED) },
+    });
+
+    let newStatus = group.status;
+    if (slotCount >= group.max_members) {
+      newStatus = GroupStatus.FULL;
+    } else {
+      newStatus = GroupStatus.PENDING;
+    }
+
+    const changed = newStatus !== group.status;
+    if (changed) {
+      await this.groupRepo.update(groupId, { status: newStatus });
+    }
+
+    return {
+      id: group.id,
+      name: group.name,
+      old_status: group.status,
+      new_status: newStatus,
+      slot_count: slotCount,
+      max_slots: group.max_members,
+      synced: changed,
+      message: changed
+        ? `Status diubah dari "${group.status}" → "${newStatus}"`
+        : `Status sudah benar (${group.status})`,
     };
   }
 

@@ -122,6 +122,31 @@ export class AdminController {
     };
   }
 
+  @Patch('groups/:id/sync-status')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Sync group status berdasarkan slot count aktual (ADMIN only)' })
+  @ApiParam({ name: 'id', type: String, description: 'Group ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Group status synced',
+    schema: {
+      example: {
+        id: '5cba01b8-4d53-4a9d-b1d6-19a3eae69ff7',
+        name: 'Arisan HONDA BEAT (Kloter A)',
+        old_status: 'full',
+        new_status: 'pending',
+        slot_count: 19,
+        max_slots: 20,
+        synced: true,
+        message: 'Status diubah dari "full" → "pending"',
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  syncGroupStatus(@Param('id') id: string) {
+    return this.adminStatsService.syncGroupStatus(id);
+  }
+
   @Get('tickets')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Get all tickets with optional filters (ADMIN only)' })
