@@ -240,7 +240,7 @@ export class AdminStatsService {
     }
 
     const slotCount = await this.ticketRepo.count({
-      where: { group_id: groupId, status: Not(TicketStatus.CANCELLED) },
+      where: { group_id: groupId, status: Not(In([TicketStatus.CANCELLED, TicketStatus.EXPIRED])) },
     });
 
     let newStatus = group.status;
