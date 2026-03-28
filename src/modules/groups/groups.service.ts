@@ -42,6 +42,7 @@ export class GroupsService {
   async createGroup(dto: CreateGroupDto, userId: string): Promise<Group> {
     const group = this.groupRepo.create({
       name: dto.name,
+      max_members: dto.max_members || 12,
       ticket_price: dto.ticket_price || 0,
       prize: dto.prize || null,
       icon: dto.icon || 'smartphone',
