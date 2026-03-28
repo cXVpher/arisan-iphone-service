@@ -44,6 +44,9 @@ export class Group {
   @Column({ type: 'boolean', default: false })
   is_hidden: boolean;
 
+  @Column({ type: 'varchar', length: 50, default: 'smartphone' })
+  icon: string;
+
   @Column({ type: 'varchar', length: 36 })
   created_by: string;
 
