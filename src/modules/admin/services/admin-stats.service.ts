@@ -333,22 +333,62 @@ export class AdminStatsService {
       order: { created_at: 'DESC' },
     });
 
-    return tickets.map((t) => ({
-      id: t.id,
-      ticket_code: t.ticket_code,
-      status: t.status,
-      created_at: t.created_at,
-      group: {
-        id: t.group.id,
-        name: t.group.name,
-        ticket_price: t.group.ticket_price,
-        status: t.group.status,
-      },
-      user: {
-        id: t.user.id,
-        username: t.user.username,
-        name: t.user.name,
-      },
-    }));
+    const ticketIds = tickets.map((t) => t.id);
+    const payments = ticketIds.length > 0
+      ? await this.paymentRepo
+          .createQueryBuilder('p')
+          .where('p.ticket_id IN (:...ids)', { ids: ticketIds })
+          .orderBy('p.created_at', 'DESC')
+          .getMany()
+      : [];
+
+    const paymentMap = new Map<string, Payment[]>();
+    payments.forEach((payment) => {
+      const existing = paymentMap.get(payment.ticket_id) ?? [];
+      existing.push(payment);
+      paymentMap.set(payment.ticket_id, existing);
+    });
+
+    return tickets.map((t) => {
+      const ticketPayments = paymentMap.get(t.id) ?? [];
+      const latestPayment = ticketPayments[0] ?? null;
+
+      return {
+        id: t.id,
+        ticket_code: t.ticket_code,
+        status: t.status,
+        created_at: t.created_at,
+        group: {
+          id: t.group.id,
+          name: t.group.name,
+          ticket_price: t.group.ticket_price,
+          status: t.group.status,
+        },
+        user: {
+          id: t.user.id,
+          username: t.user.username,
+          name: t.user.name,
+        },
+        latest_payment: latestPayment
+          ? {
+              id: latestPayment.id,
+              status: latestPayment.status,
+              proof_url: latestPayment.proof_url,
+              amount: latestPayment.amount,
+              note: latestPayment.note,
+              created_at: latestPayment.created_at,
+            }
+          : null,
+        payments: ticketPayments.map((payment) => ({
+          id: payment.id,
+          amount: payment.amount,
+          status: payment.status,
+          proof_url: payment.proof_url,
+          note: payment.note,
+          created_at: payment.created_at,
+        })),
+      };
+    });
   }
 }
+
