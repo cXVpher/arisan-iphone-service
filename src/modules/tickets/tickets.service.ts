@@ -83,7 +83,7 @@ export class TicketsService {
 
     // Update group status to FULL jika slot sudah penuh
     const newSlotCount = await this.ticketRepo.count({
-      where: { group_id: dto.group_id, status: Not(TicketStatus.CANCELLED) },
+      where: { group_id: dto.group_id, status: Not(In([TicketStatus.CANCELLED, TicketStatus.EXPIRED])) },
     });
     if (newSlotCount >= group.max_members && group.status !== GroupStatus.FULL) {
       await this.groupRepo.update(dto.group_id, { status: GroupStatus.FULL });

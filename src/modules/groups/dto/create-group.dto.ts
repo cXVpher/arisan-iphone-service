@@ -10,6 +10,10 @@ export class CreateGroupDto {
 
   @IsNumber()
   @IsOptional()
+  max_members?: number;
+
+  @IsNumber()
+  @IsOptional()
   ticket_price?: number;
 
   @IsString()
